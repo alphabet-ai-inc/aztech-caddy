@@ -3,43 +3,43 @@
 }
 
 # ========== DJANGO LANDING ==========
-// aztech-ai.com, www.aztech-ai.com {
-//     # Static files
-//     handle /static/* {
-//         root * /app/staticfiles
-//         uri strip_prefix /static
-//         file_server
-//     }
+# aztech-ai.com, www.aztech-ai.com {
+#     # Static files
+#     handle /static/* {
+#         root * /app/staticfiles
+#         uri strip_prefix /static
+#         file_server
+#     }
 
-//     # Media files
-//     handle /media/* {
-//         root * /app/media
-//         uri strip_prefix /media
-//         file_server
-//     }
+#     # Media files
+#     handle /media/* {
+#         root * /app/media
+#         uri strip_prefix /media
+#         file_server
+#     }
 
-//     # Django application
-//     reverse_proxy django-landing-app:8000
-// }
+#     # Django application
+#     reverse_proxy django-landing-app:8000
+# }
 
-// landing-dev.aztech-ai.com {
-//     # Static files
-//     handle /static/* {
-//         root * /app/staticfiles
-//         uri strip_prefix /static
-//         file_server
-//     }
+# landing-dev.aztech-ai.com {
+#     # Static files
+#     handle /static/* {
+#         root * /app/staticfiles
+#         uri strip_prefix /static
+#         file_server
+#     }
 
-//     # Media files
-//     handle /media/* {
-//         root * /app/media
-//         uri strip_prefix /media
-//         file_server
-//     }
+#     # Media files
+#     handle /media/* {
+#         root * /app/media
+#         uri strip_prefix /media
+#         file_server
+#     }
 
-//     # Django application
-//     reverse_proxy django-landing-app:8000
-// }
+#     # Django application
+#     reverse_proxy django-landing-app:8000
+# }
 
 # ========== AUTH SERVER ==========
 app.auth.aztech-ai.com {
