@@ -48,6 +48,8 @@ app.auth.aztech-ai.com {
 
 api.auth.aztech-ai.com {
     reverse_proxy https://authserver-backend:8080 {
-        tls_insecure_skip_verify
+        transport http {
+            tls_insecure_skip_verify
+        }
     }
 }
