@@ -1,0 +1,55 @@
+{
+    email jpassano@gmail.com
+}
+
+# ========== DJANGO LANDING ==========
+# aztech-ai.com, www.aztech-ai.com {
+#     # Static files
+#     handle /static/* {
+#         root * /app/staticfiles
+#         uri strip_prefix /static
+#         file_server
+#     }
+
+#     # Media files
+#     handle /media/* {
+#         root * /app/media
+#         uri strip_prefix /media
+#         file_server
+#     }
+
+#     # Django application
+#     reverse_proxy django-landing-app:8000
+# }
+
+# landing-dev.aztech-ai.com {
+#     # Static files
+#     handle /static/* {
+#         root * /app/staticfiles
+#         uri strip_prefix /static
+#         file_server
+#     }
+
+#     # Media files
+#     handle /media/* {
+#         root * /app/media
+#         uri strip_prefix /media
+#         file_server
+#     }
+
+#     # Django application
+#     reverse_proxy django-landing-app:8000
+# }
+
+# ========== AUTH SERVER ==========
+app.auth.aztech-ai.com {
+    reverse_proxy authserver-frontend:3000
+}
+
+api.auth.aztech-ai.com {
+    reverse_proxy https://authserver-backend:8080 {
+        transport http {
+            tls_insecure_skip_verify
+        }
+    }
+}
