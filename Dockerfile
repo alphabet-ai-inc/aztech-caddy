@@ -1,5 +1,5 @@
-# Use the official Caddy image
-FROM caddy:2-alpine
+# Use the official Caddy image from Docker Hub
+FROM docker.io/caddy:2-alpine
 
 # Copy the Caddyfile into the container
 COPY Caddyfile /etc/caddy/Caddyfile
