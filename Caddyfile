@@ -4,17 +4,11 @@
 
 # ========== AUTH SERVER PRODUCTION ==========
 app.auth.aztech-ai.com {
-    tls internal
     reverse_proxy authserver-frontend:3000
 }
 
 api.auth.aztech-ai.com {
-    tls internal
-    reverse_proxy https://authserver-backend:8080 {
-        transport http {
-            tls_insecure_skip_verify
-        }
-    }
+    reverse_proxy authserver-backend:8080
 }
 
 # ========== AUTH SERVER TEST ==========
