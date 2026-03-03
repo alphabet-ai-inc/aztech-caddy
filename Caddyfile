@@ -1,56 +1,11 @@
 {
 	email jpassano@gmail.com
 }
-*.auth.aztech-ai.com {
-    # Production app - Uses Let's Encrypt certificates
-    @app host app.auth.aztech-ai.com
-    handle @app {
-        reverse_proxy localhost:3000
-    }
 
-    # Production API
-    @api host api.auth.aztech-ai.com
-    handle @api {
-        reverse_proxy localhost:8080
-    }
+# Production domains - specific subdomains for HTTP-01 challenges
+app.auth.aztech-ai.com {
+	reverse_proxy 127.0.0.1:3000
 
-    # Default handler
-    handle {
-        respond "Production service not found" 404
-    }
-
-    # ACCESS LOG - must be inside site block
-    log {
-        output file /var/log/caddy/access.log {
-            roll_size 10mb
-            roll_keep 5
-            roll_keep_for 48h
-        }
-    }
-}
-
-*.auth-test.aztech-ai.com {
-	# Test environment uses internal TLS (self-signed)
-	tls internal
-
-	# Test app
-	@app host app.auth-test.aztech-ai.com
-	handle @app {
-		reverse_proxy localhost:4000
-	}
-
-	# Test API
-	@api host api.auth-test.aztech-ai.com
-	handle @api {
-		reverse_proxy localhost:8081
-	}
-
-	# Default handler
-	handle {
-		respond "Test service not found" 404
-	}
-
-	# ACCESS LOG - same file path consolidates all logs
 	log {
 		output file /var/log/caddy/access.log {
 			roll_size 10mb
@@ -59,3 +14,43 @@
 		}
 	}
 }
+
+api.auth.aztech-ai.com {
+	reverse_proxy 127.0.0.1:8080
+
+	log {
+		output file /var/log/caddy/access.log {
+			roll_size 10mb
+			roll_keep 5
+			roll_keep_for 48h
+		}
+	}
+}
+
+# Test domains - specific subdomains with self-signed certificates
+app.auth-test.aztech-ai.com {
+	tls internal
+	reverse_proxy 127.0.0.1:4000
+
+	log {
+		output file /var/log/caddy/access.log {
+			roll_size 10mb
+			roll_keep 5
+			roll_keep_for 48h
+		}
+	}
+}
+
+api.auth-test.aztech-ai.com {
+	tls internal
+	reverse_proxy 127.0.0.1:8081
+
+	log {
+		output file /var/log/caddy/access.log {
+			roll_size 10mb
+			roll_keep 5
+			roll_keep_for 48h
+		}
+	}
+}
+
