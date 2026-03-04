@@ -5,52 +5,20 @@
 # Production domains - specific subdomains for HTTP-01 challenges
 app.auth.aztech-ai.com {
 	reverse_proxy 127.0.0.1:3000
-
-	log {
-		output file /var/log/caddy/access.log {
-			roll_size 10mb
-			roll_keep 5
-			roll_keep_for 48h
-		}
-	}
 }
 
 api.auth.aztech-ai.com {
 	reverse_proxy 127.0.0.1:8080
-
-	log {
-		output file /var/log/caddy/access.log {
-			roll_size 10mb
-			roll_keep 5
-			roll_keep_for 48h
-		}
-	}
 }
 
 # Test domains - specific subdomains with self-signed certificates
 app.auth-test.aztech-ai.com {
 	tls internal
 	reverse_proxy 127.0.0.1:4000
-
-	log {
-		output file /var/log/caddy/access.log {
-			roll_size 10mb
-			roll_keep 5
-			roll_keep_for 48h
-		}
-	}
 }
 
 api.auth-test.aztech-ai.com {
 	tls internal
 	reverse_proxy 127.0.0.1:8081
-
-	log {
-		output file /var/log/caddy/access.log {
-			roll_size 10mb
-			roll_keep 5
-			roll_keep_for 48h
-		}
-	}
 }
 
