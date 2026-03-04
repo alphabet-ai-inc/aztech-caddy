@@ -34,70 +34,83 @@ jobs:
         id: vault-secrets
         env:
           VAULT_ADDR: ${{ secrets.VAULT_ADDR }}
-          VAULT_TOKEN: ${{ secrets.VAULT_TOKEN }}
+          VAULT_JWT_ROLE: github-actions
+          VAULT_TOKEN: ${{ secrets.VAULT_TOKEN }} # New token with proper permissions
         run: |
-          echo "🔐 Retrieving SSH credentials from Vault..."
+          echo "🔐 Retrieving secrets from Vault..."
           set +x
 
-          # Try different path formats
-          PATHS_TO_TRY=(
-            "secret/authserver/ssh"                    # KV v1
-            "secret/data/authserver/ssh"                # KV v2 data path
-            "secret/metadata/authserver/ssh"            # KV v2 metadata path
-            "kv/authserver/ssh"                          # Alternative mount point
-          )
+          # Use token directly (simpler, more reliable)
+          VAULT_TOKEN="${{ secrets.VAULT_TOKEN }}"
 
-          SUCCESS=false
-          for path in "${PATHS_TO_TRY[@]}"; do
-            echo "Trying path: $path"
+          # Test token permissions
+          echo "Testing Vault token permissions..."
+          TEST_RESPONSE=$(curl -s --http1.0 -H "X-Vault-Token: $VAULT_TOKEN" "$VAULT_ADDR/v1/secret/data/authserver/ssh")
 
-            RESPONSE=$(curl -s --http1.0 \
-              -H "X-Vault-Token: $VAULT_TOKEN" \
-              "$VAULT_ADDR/v1/$path")
+          if echo "$TEST_RESPONSE" | grep -q '"errors"'; then
+            ERROR_MSG=$(echo "$TEST_RESPONSE" | jq -r '.errors[0]')
+            echo "❌ Permission error: $ERROR_MSG"
+            exit 1
+          else
+            echo "✅ Token has read access to authserver/ssh"
+          fi
 
-            if ! echo "$RESPONSE" | grep -q '"errors"'; then
-              echo "✅ Success with path: $path"
-              SUCCESS=true
+          # Function to get secret
+          get_secret() {
+            local path="$1"
+            local key="$2"
 
-              # Extract based on path type
-              if [[ "$path" == *"/data/"* ]]; then
-                # KV v2 format
-                PRIVATE_KEY=$(echo "$RESPONSE" | jq -r '.data.data.private_key')
-                SERVER_IP=$(echo "$RESPONSE" | jq -r '.data.data.server_ip')
-                USERNAME=$(echo "$RESPONSE" | jq -r '.data.data.username')
-                PORT=$(echo "$RESPONSE" | jq -r '.data.data.port')
-              else
-                # KV v1 format
-                PRIVATE_KEY=$(echo "$RESPONSE" | jq -r '.data.private_key')
-                SERVER_IP=$(echo "$RESPONSE" | jq -r '.data.server_ip')
-                USERNAME=$(echo "$RESPONSE" | jq -r '.data.username')
-                PORT=$(echo "$RESPONSE" | jq -r '.data.port')
-              fi
+            # Explicitly get the latest version
+            local api_url="$VAULT_ADDR/v1/secret/data/$path?version=0"  # 0 means latest
+            local response
+            response=$(curl -s --http1.0 -H "X-Vault-Token: $VAULT_TOKEN" "$api_url")
 
-              # Save to files
-              echo "$PRIVATE_KEY" > /tmp/ssh_private_key
-              echo "$SERVER_IP" > /tmp/server_ip
-              echo "$USERNAME" > /tmp/username
-              echo "$PORT" > /tmp/ssh_port
+            echo "Getting '$key' from '$path'" >&2
 
-              break
-            else
-              echo "Path failed: $(echo "$RESPONSE" | jq -r '.errors[0]')"
+            if echo "$response" | grep -q '"errors"'; then
+              echo "❌ Error: $(echo "$response" | jq -r '.errors[0]')" >&2
+              return 1
             fi
-          done
 
-          if [ "$SUCCESS" = false ]; then
-            echo "❌ Could not find SSH credentials in any Vault path"
+            local value
+            value=$(echo "$response" | jq -r ".data.data.$key")
+
+            if [ "$value" = "null" ] || [ -z "$value" ]; then
+              echo "❌ Key '$key' not found in '$path'" >&2
+              return 1
+            fi
+
+            # Print ONLY the value to stdout
+            echo "$value"
+            echo "✅ Retrieved '$key'" >&2
+            return 0
+          }
+
+          # Get SSH private key (now properly formatted with newlines)
+          echo "🔑 Retrieving SSH private key from Vault..."
+          get_secret "authserver/ssh" "private_key" > /tmp/ssh_private_key
+
+          # Verify key was retrieved and is valid
+          if [ ! -s /tmp/ssh_private_key ]; then
+            echo "❌ SSH private key not found in Vault"
             exit 1
           fi
 
-          # Validate SSH key
-          if [ ! -s /tmp/ssh_private_key ] || ! grep -q "BEGIN OPENSSH PRIVATE KEY" /tmp/ssh_private_key; then
-            echo "❌ SSH private key invalid or not found"
+          # Quick validation - check if it has BEGIN marker
+          if ! grep -q "BEGIN OPENSSH PRIVATE KEY" /tmp/ssh_private_key; then
+            echo "❌ SSH key missing BEGIN marker - format issue"
             exit 1
           fi
 
-          echo "✅ SSH credentials retrieved successfully"
+          echo "✅ SSH key retrieved from Vault ($(wc -l < /tmp/ssh_private_key) lines, $(wc -c < /tmp/ssh_private_key) bytes)"
+
+          # Get other secrets
+          get_secret "authserver/ssh" "server_ip" > /tmp/server_ip
+          get_secret "authserver/ssh" "username" > /tmp/username
+          get_secret "authserver/ssh" "port" > /tmp/ssh_port
+
+          echo "🎉 All secrets retrieved!"
+
       # === SSH SETUP ===
       - name: Setup SSH
         run: |
