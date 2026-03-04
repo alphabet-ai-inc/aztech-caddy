@@ -174,13 +174,13 @@ jobs:
 
             echo '📋 Backing up current Caddyfile...'
             if [ -f /etc/caddy/Caddyfile ]; then
-              cp /etc/caddy/Caddyfile /etc/caddy/Caddyfile.backup
+              sudo cp /etc/caddy/Caddyfile /etc/caddy/Caddyfile.backup
               echo '✅ Backup created at /etc/caddy/Caddyfile.backup'
             fi
 
             echo '📝 Updating Caddyfile...'
             # Receive the file content via stdin
-            cat > /etc/caddy/Caddyfile
+            sudo tee /etc/caddy/Caddyfile > /dev/null
 
             # Validate the Caddyfile before reloading
             echo '🔍 Validating Caddyfile...'
@@ -189,19 +189,19 @@ jobs:
 
               # Gracefully reload Caddy (zero downtime)
               echo '🔄 Reloading Caddy gracefully...'
-              if systemctl reload caddy 2>/dev/null; then
+              if sudo systemctl reload caddy 2>/dev/null; then
                 echo '✅ Caddy reloaded successfully'
               else
                 echo '⚠️ Graceful reload failed, attempting restart...'
                 # Fallback to restart if reload fails
-                systemctl restart caddy
+                sudo systemctl restart caddy
                 echo '✅ Caddy restarted'
               fi
             else
               echo '❌ Caddyfile validation failed!'
               echo '🔄 Restoring from backup...'
               if [ -f /etc/caddy/Caddyfile.backup ]; then
-                cp /etc/caddy/Caddyfile.backup /etc/caddy/Caddyfile
+                sudo cp /etc/caddy/Caddyfile.backup /etc/caddy/Caddyfile
                 echo '✅ Backup restored'
 
                 # Validate the restored configuration
@@ -219,7 +219,7 @@ jobs:
             fi
 
             # Clean up backup if everything succeeded (optional)
-            # rm -f /etc/caddy/Caddyfile.backup
+            # sudo rm -f /etc/caddy/Caddyfile.backup
           " < /tmp/new_caddyfile
 
           echo "🎉 Caddy configuration updated successfully!"
