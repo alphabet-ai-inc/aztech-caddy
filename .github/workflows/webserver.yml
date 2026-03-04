@@ -5,7 +5,6 @@ on:
       - "Caddyfile" # Only trigger when Caddyfile changes
     branches:
       - main
-      - master
   workflow_dispatch: # Allow manual triggering
 
 # Grant minimal necessary permissions
@@ -48,7 +47,7 @@ jobs:
 
           # Test token permissions
           echo "Testing Vault token permissions..."
-          TEST_RESPONSE=$(curl -s --http1.0 -H "X-Vault-Token: $VAULT_TOKEN" "$VAULT_ADDR/v1/secret/data/authserver/ssh")
+          TEST_RESPONSE=$(curl -s --http1.0 -H "X-Vault-Token: $VAULT_TOKEN" "$VAULT_ADDR/v1/secret/authserver/ssh")
 
           if echo "$TEST_RESPONSE" | grep -q '"errors"'; then
             ERROR_MSG=$(echo "$TEST_RESPONSE" | jq -r '.errors[0]')
@@ -57,7 +56,12 @@ jobs:
           else
             echo "✅ Token has read access to authserver/ssh"
           fi
-            local api_url="$VAULT_ADDR/v1/secret/data/$path?version=0"
+
+          # Function to get secret
+          get_secret() {
+            local path="$1"
+            local key="$2"
+            local api_url="$VAULT_ADDR/v1/secret/$path"
             local response
             response=$(curl -s --http1.0 -H "X-Vault-Token: $VAULT_TOKEN" "$api_url")
 
@@ -67,7 +71,7 @@ jobs:
             fi
 
             local value
-            value=$(echo "$response" | jq -r ".data.data.$key")
+            value=$(echo "$response" | jq -r ".data.$key")
 
             if [ "$value" = "null" ] || [ -z "$value" ]; then
               echo "❌ Key '$key' not found in '$path'" >&2
