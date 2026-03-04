@@ -1,8 +1,6 @@
 name: Update Caddy Configuration
 on:
   push:
-    paths:
-      - "Caddyfile" # Only trigger when Caddyfile changes
     branches:
       - main
   workflow_dispatch: # Allow manual triggering
