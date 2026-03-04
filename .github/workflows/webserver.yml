@@ -37,15 +37,26 @@ jobs:
         id: vault-secrets
         env:
           VAULT_ADDR: ${{ secrets.VAULT_ADDR }}
-          VAULT_TOKEN: ${{ secrets.VAULT_TOKEN }}
+          VAULT_JWT_ROLE: github-actions
+          VAULT_TOKEN: ${{ secrets.VAULT_TOKEN }} # New token with proper permissions
         run: |
           echo "🔐 Retrieving SSH credentials from Vault..."
           set +x
 
-          # Function to get secret
-          get_secret() {
-            local path="$1"
-            local key="$2"
+          # Use token directly (simpler, more reliable)
+          VAULT_TOKEN="${{ secrets.VAULT_TOKEN }}"
+
+          # Test token permissions
+          echo "Testing Vault token permissions..."
+          TEST_RESPONSE=$(curl -s --http1.0 -H "X-Vault-Token: $VAULT_TOKEN" "$VAULT_ADDR/v1/secret/data/authserver/ssh")
+
+          if echo "$TEST_RESPONSE" | grep -q '"errors"'; then
+            ERROR_MSG=$(echo "$TEST_RESPONSE" | jq -r '.errors[0]')
+            echo "❌ Permission error: $ERROR_MSG"
+            exit 1
+          else
+            echo "✅ Token has read access to authserver/ssh"
+          fi
             local api_url="$VAULT_ADDR/v1/secret/data/$path?version=0"
             local response
             response=$(curl -s --http1.0 -H "X-Vault-Token: $VAULT_TOKEN" "$api_url")
