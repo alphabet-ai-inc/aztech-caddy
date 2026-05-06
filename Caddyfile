@@ -3,22 +3,29 @@
 }
 
 # Production domains - specific subdomains for HTTP-01 challenges
-app.auth.aztech-ai.com {
-	reverse_proxy 127.0.0.1:3000
-}
-
-api.auth.aztech-ai.com {
+auth-api.aztech-ai.com {
 	reverse_proxy 127.0.0.1:8080
 }
-
-# Test domains - specific subdomains with self-signed certificates
-app.auth-test.aztech-ai.com {
-	tls internal
-	reverse_proxy 127.0.0.1:4000
-}
-
-api.auth-test.aztech-ai.com {
-	tls internal
+apps-api.aztech-ai.com {
 	reverse_proxy 127.0.0.1:8081
 }
 
+users-api.aztech-ai.com {
+	reverse_proxy 127.0.0.1:8082
+}
+
+# Test domains - specific subdomains with self-signed certificates
+auth-api.test.aztech-ai.com {
+	tls internal
+	reverse_proxy 127.0.0.1:9080
+}
+
+apps-api.test.aztech-ai.com {
+	tls internal
+	reverse_proxy 127.0.0.1:9081
+}
+
+users-api.test.aztech-ai.com {
+	tls internal
+	reverse_proxy 127.0.0.1:9082
+}
