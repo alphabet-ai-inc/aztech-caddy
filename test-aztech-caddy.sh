@@ -4,7 +4,7 @@ echo ""
 
 # Test 1: Check container status
 echo "1. Container status:"
-docker ps | grep aztech-caddy
+podman ps | grep aztech-caddy
 
 # Test 2: Test routing
 echo ""
@@ -26,7 +26,7 @@ echo ""
 # Test 3: Check logs
 echo ""
 echo "3. Caddy logs:"
-docker logs aztech-caddy --tail=5
+podman logs aztech-caddy --tail=5
 
 echo ""
 echo "=== TEST FROM LOCAL MACHINE ==="
@@ -43,3 +43,6 @@ echo ""
 echo "Then test:"
 echo "curl http://aztech-ai.com"
 echo "curl http://auth-api.aztech-ai.com"
+echo "curl http://apps-api.aztech-ai.com"
+echo "curl http://users-api.aztech-ai.com"
+
