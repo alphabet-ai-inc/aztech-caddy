@@ -1,31 +1,35 @@
 {
-	email jpassano@gmail.com
+    email jpassano@gmail.com
 }
 
-# Production domains - specific subdomains for HTTP-01 challenges
-auth-api.aztech-ai.com {
-	reverse_proxy 127.0.0.1:8080
-}
-apps-api.aztech-ai.com {
-	reverse_proxy 127.0.0.1:8081
-}
-
-users-api.aztech-ai.com {
-	reverse_proxy 127.0.0.1:8082
-}
-
-# Test domains - specific subdomains with self-signed certificates
-auth-api.test.aztech-ai.com {
-	tls internal
-	reverse_proxy 127.0.0.1:9080
+api.aztech-ai.com {
+    @apps path /apps/*
+    @auth path /auth/*
+    @users path /users/*
+    
+    handle @apps {
+        reverse_proxy 127.0.0.1:8081
+    }
+    handle @auth {
+        reverse_proxy 127.0.0.1:8080
+    }
+    handle @users {
+        reverse_proxy 127.0.0.1:8082
+    }
 }
 
-apps-api.test.aztech-ai.com {
-	tls internal
-	reverse_proxy 127.0.0.1:9081
-}
-
-users-api.test.aztech-ai.com {
-	tls internal
-	reverse_proxy 127.0.0.1:9082
+test.aztech-ai.com {
+    @apps path /apps/*
+    @auth path /auth/*
+    @users path /users/*
+    
+    handle @apps {
+        reverse_proxy 127.0.0.1:9081
+    }
+    handle @auth {
+        reverse_proxy 127.0.0.1:9080
+    }
+    handle @users {
+        reverse_proxy 127.0.0.1:9082
+    }
 }
