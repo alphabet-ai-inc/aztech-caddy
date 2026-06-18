@@ -71,31 +71,24 @@ jobs:
           echo "🔑 Setting up SSH..."
           mkdir -p ~/.ssh
 
-          # Copy SSH key
-          cp /tmp/ssh_key ~/.ssh/deploy_key
-          sed -i 's/\r//g' ~/.ssh/deploy_key
+          # Clean and setup SSH key
+          cat /tmp/ssh_key | tr -d '\r' > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
-
-          # Validate the key
-          if ! ssh-keygen -l -f ~/.ssh/deploy_key &>/dev/null; then
-            echo "❌ SSH key is invalid"
-            ssh-keygen -l -f ~/.ssh/deploy_key 2>&1
-            exit 1
-          fi
-
-          # Read server details
-          SERVER_IP=$(cat /tmp/server_ip | tr -d '[:space:]')
-          SSH_USERNAME=$(cat /tmp/username | tr -d '[:space:]')
-          SSH_PORT=$(cat /tmp/ssh_port | tr -d '[:space:]')
-
-          echo "Target server: $SERVER_IP"
-          echo "SSH user: $SSH_USERNAME"
-          echo "SSH port: $SSH_PORT"
-
-          # Save for later steps
+          
+          # Get connection details
+          SERVER_IP=$(cat /tmp/server_ip | tr -d ' \n\r')
+          SSH_USERNAME=$(cat /tmp/ssh_username | tr -d ' \n\r')
+          SSH_PORT=$(cat /tmp/ssh_port | tr -d ' \n\r')
+          
+          [ -z "$SSH_USERNAME" ] && echo "❌ No SSH username available in SEC Server" && exit 1          
+          [ -z "SSH_PORT" ] && echo "❌ No SSH username available in SEC Server" && exit 1 
+          
           echo "SERVER_IP=$SERVER_IP" >> $GITHUB_ENV
           echo "SSH_USERNAME=$SSH_USERNAME" >> $GITHUB_ENV
           echo "SSH_PORT=$SSH_PORT" >> $GITHUB_ENV
+          
+          # Add to known hosts
+          ssh-keyscan -p "$SSH_PORT" -H "$SERVER_IP" >> ~/.ssh/known_hosts 2>/dev/null || true
 
       # === TEST SSH CONNECTION ===
       - name: Test SSH Connection
