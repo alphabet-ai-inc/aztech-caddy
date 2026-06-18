@@ -1,35 +1,39 @@
 {
-    email jpassano@gmail.com
+	email jorgepassano@gmail.com
 }
 
 api.aztech-ai.com {
-    @apps path /apps/*
-    @auth path /auth/*
-    @users path /users/*
-    
-    handle @apps {
-        reverse_proxy 127.0.0.1:8081
-    }
-    handle @auth {
-        reverse_proxy 127.0.0.1:8080
-    }
-    handle @users {
-        reverse_proxy 127.0.0.1:8082
-    }
+	@apps path /apps*
+	@auth path /auth*
+	@users path /users*
+
+	handle @apps {
+		# Strip /apps prefix before sending to app
+		rewrite * /{path:1} # Removes /apps prefix        
+		reverse_proxy 127.0.0.1:8081
+	}
+	handle @auth {
+		rewrite * /{path:1} # Removes /auth prefix
+		reverse_proxy 127.0.0.1:8080
+	}
+	handle @users {
+		rewrite * /{path:1} # Removes /users prefix
+		reverse_proxy 127.0.0.1:8082
+	}
 }
 
 test.aztech-ai.com {
-    @apps path /apps/*
-    @auth path /auth/*
-    @users path /users/*
-    
-    handle @apps {
-        reverse_proxy 127.0.0.1:9081
-    }
-    handle @auth {
-        reverse_proxy 127.0.0.1:9080
-    }
-    handle @users {
-        reverse_proxy 127.0.0.1:9082
-    }
+	@apps path /apps*
+	@auth path /auth*
+	@users path /users*
+
+	handle @apps {
+		reverse_proxy 127.0.0.1:9081
+	}
+	handle @auth {
+		reverse_proxy 127.0.0.1:9080
+	}
+	handle @users {
+		reverse_proxy 127.0.0.1:9082
+	}
 }
