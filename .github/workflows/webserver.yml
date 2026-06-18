@@ -7,9 +7,10 @@ on:
 
 # Grant minimal necessary permissions
 permissions:
-  contents: write
+  contents: read
   actions: read
-  id-token: write
+  packages: read
+
 env:
   # GitHub organization and repository info
   GITHUB_ORG: "alphabet-ai-inc"
@@ -46,8 +47,11 @@ jobs:
           set -e
           
           # Define paths
-          SSH_PATH="secret/data/${PREFIX}/ssh"
+          # The SSH_PATH is the same for all microservices. 
+          # TODO: change the SSH_PATH to secret/data/ssh (without apps-api) and modify the 
+          # secret in vault server.
           
+          SSH_PATH="secret/data/apps-api/ssh"
           # Fetch SSH secrets using Vault CLI (simpler and more reliable)
           echo "📡 Fetching SSH secrets..."
           vault read -format=json "${SSH_PATH}" | jq -r '.data.data.private_key' > /tmp/ssh_key
