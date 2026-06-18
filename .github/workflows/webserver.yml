@@ -46,7 +46,7 @@ jobs:
           set -e
           
           # Define paths
-          SSH_PATH="secret/data/authserver/ssh"
+          SSH_PATH="secret/data/${PREFIX}/ssh"
           
           # Fetch SSH secrets using Vault CLI (simpler and more reliable)
           echo "📡 Fetching SSH secrets..."
