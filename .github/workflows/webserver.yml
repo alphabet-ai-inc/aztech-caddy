@@ -101,12 +101,10 @@ jobs:
       - name: Test SSH Connection
         run: |
           echo "🔌 Testing SSH connection..."
-          ssh -p $SSH_PORT -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
-            -o ConnectTimeout=10 -o PasswordAuthentication=no \
-            $SSH_USERNAME@$SERVER_IP "echo '✅ SSH connection successful'"
-
-          if [ $? -eq 0 ]; then
-            echo "🎯 SSH connection test passed"
+          if ssh -i ~/.ssh/deploy_key -p $SSH_PORT -o ConnectTimeout=10 \
+               -o StrictHostKeyChecking=accept-new \
+               $SSH_USERNAME@$SERVER_IP "echo '✅ SSH OK'"; then
+            echo "✅ SSH connection successful"
           else
             echo "❌ SSH connection failed"
             exit 1
