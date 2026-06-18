@@ -28,89 +28,40 @@ jobs:
           sparse-checkout: |
             Caddyfile
           sparse-checkout-cone-mode: false
+      - name: Install Vault
+        run: |
+          if ! command -v vault &> /dev/null; then
+            wget -O- https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
+            echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
+            sudo apt update && sudo apt install -y vault
+          fi
 
-      # === GET VAULT SECRETS ===
-      - name: Get Vault Secrets
-        id: vault-secrets
+      # Fetch secrets from Vault
+      - name: Fetch Vault secrets
+        id: vault
         env:
           VAULT_ADDR: ${{ secrets.VAULT_ADDR }}
-          VAULT_JWT_ROLE: github-actions
-          VAULT_TOKEN: ${{ secrets.VAULT_TOKEN }} # New token with proper permissions
+          VAULT_TOKEN: ${{ secrets.VAULT_TOKEN }}
         run: |
-          echo "🔐 Retrieving secrets from Vault..."
-          set +x
-
-          # Use token directly (simpler, more reliable)
-          VAULT_TOKEN="${{ secrets.VAULT_TOKEN }}"
-
-          # Test token permissions
-          echo "Testing Vault token permissions..."
-          TEST_RESPONSE=$(curl -s --http1.0 -H "X-Vault-Token: $VAULT_TOKEN" "$VAULT_ADDR/v1/secret/data/authserver/ssh")
-
-          if echo "$TEST_RESPONSE" | grep -q '"errors"'; then
-            ERROR_MSG=$(echo "$TEST_RESPONSE" | jq -r '.errors[0]')
-            echo "❌ Permission error: $ERROR_MSG"
-            exit 1
-          else
-            echo "✅ Token has read access to authserver/ssh"
-          fi
-
-          # Function to get secret
-          get_secret() {
-            local path="$1"
-            local key="$2"
-
-            # Explicitly get the latest version
-            local api_url="$VAULT_ADDR/v1/secret/data/$path?version=0"  # 0 means latest
-            local response
-            response=$(curl -s --http1.0 -H "X-Vault-Token: $VAULT_TOKEN" "$api_url")
-
-            echo "Getting '$key' from '$path'" >&2
-
-            if echo "$response" | grep -q '"errors"'; then
-              echo "❌ Error: $(echo "$response" | jq -r '.errors[0]')" >&2
-              return 1
-            fi
-
-            local value
-            value=$(echo "$response" | jq -r ".data.data.$key")
-
-            if [ "$value" = "null" ] || [ -z "$value" ]; then
-              echo "❌ Key '$key' not found in '$path'" >&2
-              return 1
-            fi
-
-            # Print ONLY the value to stdout
-            echo "$value"
-            echo "✅ Retrieved '$key'" >&2
-            return 0
-          }
-
-          # Get SSH private key (now properly formatted with newlines)
-          echo "🔑 Retrieving SSH private key from Vault..."
-          get_secret "authserver/ssh" "private_key" > /tmp/ssh_private_key
-
-          # Verify key was retrieved and is valid
-          if [ ! -s /tmp/ssh_private_key ]; then
-            echo "❌ SSH private key not found in Vault"
+          set -e
+          
+          # Define paths
+          SSH_PATH="secret/data/authserver/ssh"
+          
+          # Fetch SSH secrets using Vault CLI (simpler and more reliable)
+          echo "📡 Fetching SSH secrets..."
+          vault read -format=json "${SSH_PATH}" | jq -r '.data.data.private_key' > /tmp/ssh_key
+          vault read -format=json "${SSH_PATH}" | jq -r '.data.data.server_ip' > /tmp/server_ip
+          vault read -format=json "${SSH_PATH}" | jq -r '.data.data.username // ""' > /tmp/ssh_user
+          vault read -format=json "${SSH_PATH}" | jq -r '.data.data.port // ""' > /tmp/ssh_port
+          
+          # Validate SSH key
+          if [ ! -s /tmp/ssh_key ] || ! grep -q "BEGIN" /tmp/ssh_key; then
+            echo "❌ Invalid SSH key retrieved"
             exit 1
           fi
-
-          # Quick validation - check if it has BEGIN marker
-          if ! grep -q "BEGIN OPENSSH PRIVATE KEY" /tmp/ssh_private_key; then
-            echo "❌ SSH key missing BEGIN marker - format issue"
-            exit 1
-          fi
-
-          echo "✅ SSH key retrieved from Vault ($(wc -l < /tmp/ssh_private_key) lines, $(wc -c < /tmp/ssh_private_key) bytes)"
-
-          # Get other secrets
-          get_secret "authserver/ssh" "server_ip" > /tmp/server_ip
-          get_secret "authserver/ssh" "username" > /tmp/username
-          get_secret "authserver/ssh" "port" > /tmp/ssh_port
-
-          echo "🎉 All secrets retrieved!"
-
+          
+          echo "✅ SSH secrets retrieved successfully"
       # === SSH SETUP ===
       - name: Setup SSH
         run: |
@@ -118,7 +69,7 @@ jobs:
           mkdir -p ~/.ssh
 
           # Copy SSH key
-          cp /tmp/ssh_private_key ~/.ssh/deploy_key
+          cp /tmp/ssh_key ~/.ssh/deploy_key
           sed -i 's/\r//g' ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
 
