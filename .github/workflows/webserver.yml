@@ -60,7 +60,6 @@ jobs:
             echo "❌ Invalid SSH key retrieved"
             exit 1
           fi
-          
           echo "✅ SSH secrets retrieved successfully"
       # === SSH SETUP ===
       - name: Setup SSH
