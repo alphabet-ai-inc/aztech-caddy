@@ -1,27 +1,33 @@
+
 {
 	email jorgepassano@gmail.com
 }
 
 api.aztech-ai.com {
-	@apps path /apps*
-	@auth path /auth*
-	@users path /users*
-
-	handle @apps {
-		# Strip /apps prefix before sending to app
-		rewrite * /{path:1} # Removes /apps prefix        
-		reverse_proxy 127.0.0.1:8081
-	}
-	handle @auth {
-		rewrite * /{path:1} # Removes /auth prefix
+	# Auth API - automatically strips /auth-api prefix
+	handle_path /auth-api/* {
 		reverse_proxy 127.0.0.1:8080
 	}
-	handle @users {
-		rewrite * /{path:1} # Removes /users prefix
+
+	# Apps API - automatically strips /apps-api prefix
+	handle_path /apps-api/* {
+		reverse_proxy 127.0.0.1:8081
+	}
+
+	# Banxico API - automatically strips /banxico-api prefix
+	handle_path /banxico-api/* {
 		reverse_proxy 127.0.0.1:8082
 	}
+	# People API - automatically strips /people-api prefix
+	handle_path /people-api/* {
+		reverse_proxy 127.0.0.1:8083
+	}
+	# Profile API - automatically strips /profile-api prefix
+	handle_path /profile-api/* {
+		reverse_proxy 127.0.0.1:8084
+	}
 }
-
+# test not working: only as example
 test.aztech-ai.com {
 	@apps path /apps*
 	@auth path /auth*
@@ -32,8 +38,5 @@ test.aztech-ai.com {
 	}
 	handle @auth {
 		reverse_proxy 127.0.0.1:9080
-	}
-	handle @users {
-		reverse_proxy 127.0.0.1:9082
 	}
 }

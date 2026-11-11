@@ -1,210 +1,36 @@
-name: Update Caddy Configuration
+name: Deploy Caddy
+
 on:
   push:
-    branches:
-      - main
-  workflow_dispatch: # Allow manual triggering
-
-# Grant minimal necessary permissions
-permissions:
-  contents: read
-  actions: read
-  packages: read
-
-env:
-  # GitHub organization and repository info
-  GITHUB_ORG: "alphabet-ai-inc"
-  CADDY_REPO: "aztech-caddy"
+    branches: [main]
+    paths:
+      - 'Caddyfile'
+  workflow_dispatch:
 
 jobs:
-  update-caddy:
-    name: Update Caddy Configuration
+  deploy:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          # Only fetch the Caddyfile
-          sparse-checkout: |
-            Caddyfile
-          sparse-checkout-cone-mode: false
-      - name: Install Vault
-        run: |
-          if ! command -v vault &> /dev/null; then
-            wget -O- https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
-            echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
-            sudo apt update && sudo apt install -y vault
-          fi
+      - uses: actions/checkout@v4
 
-      # Fetch secrets from Vault
-      - name: Fetch Vault secrets
-        id: vault
-        env:
-          VAULT_ADDR: ${{ secrets.VAULT_ADDR }}
-          VAULT_TOKEN: ${{ secrets.VAULT_TOKEN }}
-        run: |
-          set -e
-          
-          # Define paths
-          # The SSH_PATH is the same for all microservices. 
-          # TODO: change the SSH_PATH to secret/data/ssh (without apps-api) and modify the 
-          # secret in vault server.
-
-          SSH_PATH="secret/data/apps-api/ssh"
-          # Fetch SSH secrets using Vault CLI (simpler and more reliable)
-          echo "📡 Fetching SSH secrets..."
-          vault read -format=json "${SSH_PATH}" | jq -r '.data.data.private_key' > /tmp/ssh_key
-          vault read -format=json "${SSH_PATH}" | jq -r '.data.data.server_ip' > /tmp/server_ip
-          vault read -format=json "${SSH_PATH}" | jq -r '.data.data.username // ""' > /tmp/ssh_username
-          vault read -format=json "${SSH_PATH}" | jq -r '.data.data.port // ""' > /tmp/ssh_port
-          
-          # Validate SSH key
-          if [ ! -s /tmp/ssh_key ] || ! grep -q "BEGIN" /tmp/ssh_key; then
-            echo "❌ Invalid SSH key retrieved"
-            exit 1
-          fi
-          echo "✅ SSH secrets retrieved successfully"
-      # === SSH SETUP ===
       - name: Setup SSH
         run: |
-          echo "🔑 Setting up SSH..."
           mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H "$(echo "${{ secrets.SSH_ADDRESS }}" | cut -d@ -f2)" >> ~/.ssh/known_hosts 2>/dev/null
 
-          # Clean and setup SSH key
-          cat /tmp/ssh_key | tr -d '\r' > ~/.ssh/deploy_key
-          chmod 600 ~/.ssh/deploy_key
-          
-          # Get connection details
-          SERVER_IP=$(cat /tmp/server_ip | tr -d ' \n\r')
-          SSH_USERNAME=$(cat /tmp/ssh_username | tr -d ' \n\r')
-          SSH_PORT=$(cat /tmp/ssh_port | tr -d ' \n\r')
-          
-          [ -z "$SSH_USERNAME" ] && echo "❌ No SSH username available in SEC Server" && exit 1          
-          [ -z "SSH_PORT" ] && echo "❌ No SSH username available in SEC Server" && exit 1 
-          
-          echo "SERVER_IP=$SERVER_IP" >> $GITHUB_ENV
-          echo "SSH_USERNAME=$SSH_USERNAME" >> $GITHUB_ENV
-          echo "SSH_PORT=$SSH_PORT" >> $GITHUB_ENV
-          
-          # Add to known hosts
-          ssh-keyscan -p "$SSH_PORT" -H "$SERVER_IP" >> ~/.ssh/known_hosts 2>/dev/null || true
-
-      # === TEST SSH CONNECTION ===
-      - name: Test SSH Connection
+      - name: Copy Caddyfile
         run: |
-          echo "🔌 Testing SSH connection..."
-          if ssh -i ~/.ssh/deploy_key -p $SSH_PORT -o ConnectTimeout=10 \
-               -o StrictHostKeyChecking=accept-new \
-               $SSH_USERNAME@$SERVER_IP "echo '✅ SSH OK'"; then
-            echo "✅ SSH connection successful"
-          else
-            echo "❌ SSH connection failed"
-            exit 1
-          fi
+          scp -i ~/.ssh/id_ed25519 Caddyfile \
+            ${{ secrets.SSH_ADDRESS }}:/tmp/Caddyfile
 
-      # === UPDATE CADDYFILE AND RELOAD ===
-      - name: Update Caddyfile and Reload Caddy
+      - name: Install, validate, restart
         run: |
-          echo "📝 Updating Caddy configuration..."
-
-          # Create a temporary file with the new Caddyfile content
-          # This ensures we don't send multi-line content directly in the command
-          cat Caddyfile > /tmp/new_caddyfile
-
-          # Copy the new Caddyfile to the server and reload Caddy
-          ssh -p $SSH_PORT -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
-            $SSH_USERNAME@$SERVER_IP "
-            set -e  # Exit on any error
-
-            echo '📋 Backing up current Caddyfile...'
-            if [ -f /etc/caddy/Caddyfile ]; then
-              sudo cp /etc/caddy/Caddyfile /etc/caddy/Caddyfile.backup
-              echo '✅ Backup created at /etc/caddy/Caddyfile.backup'
-            fi
-
-            echo '📝 Updating Caddyfile...'
-            # Receive the file content via stdin
-            sudo tee /etc/caddy/Caddyfile > /dev/null
-
-            # Validate the Caddyfile before reloading
-            echo '🔍 Validating Caddyfile...'
-            if caddy validate --config /etc/caddy/Caddyfile; then
-              echo '✅ Caddyfile validation successful'
-
-              # Gracefully reload Caddy (zero downtime)
-              echo '🔄 Reloading Caddy gracefully...'
-              if sudo systemctl reload caddy 2>/dev/null; then
-                echo '✅ Caddy reloaded successfully'
-              else
-                echo '⚠️ Graceful reload failed, attempting restart...'
-                # Fallback to restart if reload fails
-                sudo systemctl restart caddy
-                echo '✅ Caddy restarted'
-              fi
-            else
-              echo '❌ Caddyfile validation failed!'
-              echo '🔄 Restoring from backup...'
-              if [ -f /etc/caddy/Caddyfile.backup ]; then
-                sudo cp /etc/caddy/Caddyfile.backup /etc/caddy/Caddyfile
-                echo '✅ Backup restored'
-
-                # Validate the restored configuration
-                if caddy validate --config /etc/caddy/Caddyfile; then
-                  echo '✅ Restored configuration is valid'
-                else
-                  echo '❌ CRITICAL: Backup configuration also invalid!'
-                  exit 1
-                fi
-              else
-                echo '❌ CRITICAL: No backup available to restore!'
-                exit 1
-              fi
-              exit 1
-            fi
-
-            # Clean up backup if everything succeeded (optional)
-            # sudo rm -f /etc/caddy/Caddyfile.backup
-          " < /tmp/new_caddyfile
-
-          echo "🎉 Caddy configuration updated successfully!"
-
-      # === VERIFY UPDATE ===
-      - name: Verify Update
-        run: |
-          echo "🔍 Verifying Caddy configuration..."
-
-          ssh -p $SSH_PORT -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
-            $SSH_USERNAME@$SERVER_IP "
-            echo '=== Caddy Update Verification ==='
-
-            # Check if Caddy is running
-            echo '1. Caddy service status:'
-            systemctl status caddy --no-pager -l
-
-            # Show Caddy version and config hash
-            echo '2. Caddy version and config info:'
-            caddy version
-
-            # Check if Caddyfile exists and show its modification time
-            echo '3. Caddyfile details:'
-            ls -la /etc/caddy/Caddyfile
-
-            # Show Caddy logs (last 5 lines)
-            echo '4. Recent Caddy logs:'
-            journalctl -u caddy --no-pager -n 5
-
-            echo '✅ Verification complete'
-          "
-
-      # === OPTIONAL: NOTIFY ON SUCCESS/FAILURE ===
-      - name: Send notification (optional)
-        if: always() # Run even if previous steps failed
-        run: |
-          if [ "${{ job.status }}" = "success" ]; then
-            echo "✅ Caddy update completed successfully"
-            # You could add Slack/Discord webhook here
-          else
-            echo "❌ Caddy update failed"
-            # You could add alert here
-          fi
+          ssh -i ~/.ssh/id_ed25519 ${{ secrets.SSH_ADDRESS }} '
+            set -e
+            sudo mv /tmp/Caddyfile /etc/caddy/Caddyfile
+            sudo chown root:root /etc/caddy/Caddyfile
+            sudo caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+            sudo systemctl restart caddy
+          '
