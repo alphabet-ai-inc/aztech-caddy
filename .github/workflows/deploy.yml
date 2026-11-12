@@ -1,0 +1,59 @@
+name: Deploy Caddy
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'Caddyfile'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_KEY }}" > ~/.ssh/deploy_key
+          sed -i 's/\r//g' ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+
+          addr="${{ secrets.SSH_ADDR }}"
+          echo "SERVER_IP=${addr%%:*}" >> "$GITHUB_ENV"
+          echo "SSH_PORT=${addr##*:}"  >> "$GITHUB_ENV"
+
+      - name: Add host key to known_hosts
+        run: |
+          ssh-keyscan -p "$SSH_PORT" -H "$SERVER_IP" >> ~/.ssh/known_hosts 2>/dev/null
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Ensure remote directory exists
+        run: |
+          ssh -p "$SSH_PORT" -i ~/.ssh/deploy_key \
+            -o StrictHostKeyChecking=yes \
+            -o BatchMode=yes \
+            deployer@"$SERVER_IP" \
+            "mkdir -p /tmp"
+
+      - name: Push Caddyfile to /etc/caddy
+        run: |
+          scp -P "$SSH_PORT" -i ~/.ssh/deploy_key \
+            -o StrictHostKeyChecking=yes \
+            -o BatchMode=yes \
+            Caddyfile \
+            deployer@"$SERVER_IP":/tmp/Caddyfile
+
+      - name: Install, validate, restart
+        run: |
+          ssh -p "$SSH_PORT" -i ~/.ssh/deploy_key \
+            -o StrictHostKeyChecking=yes \
+            -o BatchMode=yes \
+            deployer@"$SERVER_IP" '
+            set -e
+            sudo mv /tmp/Caddyfile /etc/caddy/Caddyfile
+            sudo chown root:root /etc/caddy/Caddyfile
+            sudo caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+            sudo systemctl restart caddy
+          '
