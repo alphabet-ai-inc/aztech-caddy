@@ -51,6 +51,7 @@ jobs:
             -o StrictHostKeyChecking=yes \
             -o BatchMode=yes \
             deployer@"$SERVER_IP" '
+            set -e
             sudo mv /tmp/Caddyfile /etc/caddy/Caddyfile
             sudo chown root:root /etc/caddy/Caddyfile
             sudo caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
